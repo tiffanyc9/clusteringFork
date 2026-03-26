@@ -1,39 +1,135 @@
-# A Novel Semi-Supervised Clustering Method
-This project implements a semi-supervised clustering algorithm, based on the method described in the following publication:
-https://arxiv.org/abs/2306.06974
+# Seed-Guided Semi-Supervised Clustering
 
-The algorithm takes as input a matrix of numerical features, where each row represents an example and each column a feature. An additional column must contain partial labels (seeds), which are externally provided. Labels must be integers >= -1, with -1 reserved for unlabelled examples.
+This repository contains the reference implementation for a semi-supervised clustering method that grows seed-defined clusters using anomaly detection. The method is described in:
 
-As a rule of thumb, it is recommended to provide 10-30 labelled examples per known class to ensure effective clustering.
+- [Seed-Guided Semi-Supervised Clustering by A-Contrario Anomaly Detection](https://arxiv.org/abs/2306.06974)
 
-At its core, the algorithm uses the Perception anomaly detection algorithm. Starting from the initial labelled seeds, it iteratively adds or ejects points from each cluster based on their consistency with the group. This process continues until the clusters stabilise or a maximum number of iterations is reached.
+At a high level, the algorithm starts from a small number of labelled seed points per class, fits an anomaly detector to each seeded cluster, ejects inconsistent points, and then attempts to claim compatible unlabelled points. Points that do not fit any seeded cluster remain labelled as `-1`.
 
-See the notebooks folder for getting started guides containing examples of using the method, and its performance against other popular clustering methods.
+## What The Package Does
 
-Key features:
-- Supports both one-dimensional and multi-dimensional numerical data.
-- Assigns a cluster label to every input example.
-- Uses the label -1 to indicate anomalous examples.
-- These anomalous examples can be reviewed in follow-up analysis, allowing users to refine labels and re-run clustering in iterative cycles.
+- Accepts numeric feature data plus one seed-label column
+- Uses `-1` as the unlabelled / anomalous label
+- Iteratively refines seeded clusters rather than forcing every point into a cluster
+- Returns a label for every input row, with rejected points preserved as `-1`
+
+As a practical rule of thumb, the method usually benefits from at least 10 to 30 labelled examples per known class.
+
+## Repository Layout
+
+- [`clustering_nassir/`](clustering_nassir): installable Python package
+- [`notebooks/`](notebooks): usage guides and exploratory analysis
+- [`evaluation/`](evaluation): benchmark scripts and experiment drivers
+- [`utilities/`](utilities): dataset loading, plotting, metrics, and helper functions
+- [`tests/`](tests): test code
 
 ## Installation
-To install the solution via `pip`, you can use the following command:
+
+There are two common ways to work with this repository.
+
+### 1. Install The Core Package
+
+Use this if you only want the clustering model itself.
 
 ```bash
-pip install clustering_nassir
+pip install clustering-nassir
 ```
 
-## Usage
+Or from a local checkout:
 
 ```bash
+pip install .
+```
+
+### 2. Install The Full Research Environment
+
+Use this if you want to run the notebooks, evaluation scripts, and paper experiments.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
+```
+
+The repository-level `requirements.txt` includes the extra scientific and notebook dependencies used by the evaluation code. The package `setup.py` remains focused on the core library dependency set.
+
+## Quick Start
+
+```python
+import pandas as pd
 from clustering_nassir import SemiSupervisedClusterer
 
-# Prepare your DataFrame
-# Include feature columns plus a 'y_live' column containing the labelled seeds
-data = df[["feature1", "feature2", "feature3", "y_live"]].to_numpy()
+df = pd.DataFrame(
+    {
+        "x1": [0.0, 0.2, 0.1, 4.9, 5.0, 5.2, 9.0],
+        "x2": [0.1, 0.0, 0.3, 5.1, 4.8, 5.0, 9.1],
+        "y_live": [0, 0, -1, 1, 1, -1, -1],
+    }
+)
 
-# Fit the model
-model = SemiSupervisedClusterer()
-df["clustering_result"] = model.fit(data)
+X_with_seeds = df[["x1", "x2", "y_live"]].to_numpy()
+
+model = SemiSupervisedClusterer(max_n_iterations=1000)
+df["cluster"] = model.fit(X_with_seeds)
+
+print(df)
 ```
 
+### Input Format
+
+- All feature columns must be numeric
+- The final column must contain integer seed labels
+- Use `-1` for unlabelled points
+- Each labelled cluster must contain at least 3 seed examples
+
+## Running The Notebooks
+
+The easiest entry points are:
+
+- [`notebooks/getting_started_guide_1.ipynb`](notebooks/getting_started_guide_1.ipynb)
+- [`notebooks/getting_started_guide_2.ipynb`](notebooks/getting_started_guide_2.ipynb)
+- [`notebooks/clustering_methods_and_evaluation.ipynb`](notebooks/clustering_methods_and_evaluation.ipynb)
+
+Launch Jupyter from the repository root after installing the full environment:
+
+```bash
+jupyter lab
+```
+
+## Running The Evaluation Scripts
+
+The main experiment entry point is:
+
+- [`evaluation/clustering_evaluation.py`](evaluation/clustering_evaluation.py)
+
+Typical usage:
+
+```bash
+python evaluation/clustering_evaluation.py
+```
+
+The datasets, enabled baselines, and selected metrics are configured in:
+
+- [`evaluation/evaluation_configs.py`](evaluation/evaluation_configs.py)
+
+## Development Notes
+
+- The installable package is intentionally lightweight
+- The evaluation code depends on a wider research stack than the core package
+- Results, generated tables, and local experiment outputs are excluded by `.gitignore`
+- Some benchmark scripts assume local datasets or external packages that are not required for the core clustering API
+
+## Packaging
+
+This repository now includes:
+
+- `setup.py` for package metadata and installation
+- `pyproject.toml` for modern build tooling
+- `requirements.txt` for the full research environment
+
+That combination is enough for local development, editable installs, and package builds. You do not need a separate `setup.cfg` unless you want to migrate more metadata out of `setup.py`.
+
+## License
+
+This project is licensed under the MIT License. See [`LICENSE`](LICENSE).

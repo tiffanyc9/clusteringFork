@@ -11,7 +11,8 @@ umap-learn
 kneed
 hdbscan
 k-means-constrained
-copkmeans
+# copkmeans
+copkmeans-ht
 clustpy
 perception_nassir
 nltk

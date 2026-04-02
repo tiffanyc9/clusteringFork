@@ -45,9 +45,27 @@ pip install .
 
 Use this if you want to run the notebooks, evaluation scripts, and paper experiments.
 
+<!-- ### macOS
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
+```
+
+### Windows
+```bash
+python -m venv .venv
+source .venv/Scripts/activate
+pip install -r requirements.txt
+pip install -e .
+``` -->
+
+### Conda environment
+```bash
+conda create --name clustering python=3.11
+conda activate clustering
 pip install -r requirements.txt
 pip install -e .
 ```

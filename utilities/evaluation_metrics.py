@@ -1,12 +1,21 @@
 # %% imports
-from typing import List
-import pandas as pd
-from sklearn.metrics import (adjusted_rand_score, completeness_score, v_measure_score,
-                             normalized_mutual_info_score, silhouette_score,
-                             davies_bouldin_score, calinski_harabasz_score,
-                             fowlkes_mallows_score, accuracy_score, homogeneity_score
-                             )
+from typing import Dict, List
 import logging
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import (
+    accuracy_score,
+    adjusted_rand_score,
+    calinski_harabasz_score,
+    completeness_score,
+    davies_bouldin_score,
+    fowlkes_mallows_score,
+    homogeneity_score,
+    normalized_mutual_info_score,
+    silhouette_score,
+    v_measure_score,
+)
 # ---------------------------- Supervised metrics -----------------------------------
 def compute_accuracy(df, true_col, pred_col):
     if df.empty:
@@ -67,9 +76,89 @@ def compute_calinski_harabasz(df: pd.DataFrame, pred_col: str, features: List[st
         return -1.0
     return calinski_harabasz_score(df[features], df[pred_col])
 
-import numpy as np
-import pandas as pd
-import logging
+def get_retained_subset(
+    df: pd.DataFrame,
+    pred_col: str,
+    true_col: str = "y_true",
+    outlier_label: int = -1,
+) -> pd.DataFrame:
+    """Return the subset used by the original retained-point evaluation."""
+    return df[(df[true_col] != outlier_label) & (df[pred_col] != outlier_label)].copy()
+
+def compute_rejection_stats(
+    df: pd.DataFrame,
+    pred_col: str,
+    outlier_label: int = -1,
+) -> Dict[str, float]:
+    """Return rejected-point count and rate for a prediction column."""
+    rejected_count = int((df[pred_col] == outlier_label).sum())
+    total_count = int(len(df))
+    rejection_rate = rejected_count / total_count if total_count else 0.0
+    return {
+        "Rejected Count": rejected_count,
+        "Rejection Rate": rejection_rate,
+    }
+
+def _compute_metric_for_scope(
+    df_scope: pd.DataFrame,
+    metric_fn,
+    requires_gt: bool,
+    pred_col: str,
+    feature_columns: List[str],
+    true_col: str = "y_true",
+):
+    if requires_gt:
+        if true_col not in df_scope.columns or pred_col not in df_scope.columns or df_scope.empty:
+            return None
+        return metric_fn(df_scope, true_col=true_col, pred_col=pred_col)
+
+    if df_scope.empty or df_scope[pred_col].nunique() < 2:
+        return None
+    return metric_fn(df_scope, pred_col=pred_col, features=feature_columns)
+
+def evaluate_prediction_scopes(
+    df: pd.DataFrame,
+    metrics_dict: Dict[str, Dict[str, object]],
+    pred_col: str,
+    feature_columns: List[str],
+    true_col: str = "y_true",
+    outlier_label: int = -1,
+    retained_suffix: str = " (retained)",
+    full_suffix: str = " (full)",
+) -> Dict[str, float]:
+    """
+    Evaluate clustering on both the original retained subset and the full dataset.
+
+    The returned dict is flat so it can be added directly to experiment rows/tables.
+    """
+    retained_df = get_retained_subset(df, pred_col=pred_col, true_col=true_col, outlier_label=outlier_label)
+    results = compute_rejection_stats(df, pred_col=pred_col, outlier_label=outlier_label)
+
+    for metric_name, metric_info in metrics_dict.items():
+        metric_fn = metric_info["fn"]
+        requires_gt = metric_info["requires_gt"]
+
+        retained_score = _compute_metric_for_scope(
+            retained_df,
+            metric_fn=metric_fn,
+            requires_gt=requires_gt,
+            pred_col=pred_col,
+            feature_columns=feature_columns,
+            true_col=true_col,
+        )
+        full_score = _compute_metric_for_scope(
+            df,
+            metric_fn=metric_fn,
+            requires_gt=requires_gt,
+            pred_col=pred_col,
+            feature_columns=feature_columns,
+            true_col=true_col,
+        )
+
+        results[f"{metric_name}{retained_suffix}"] = retained_score
+        results[f"{metric_name}{full_suffix}"] = full_score
+
+    return results
 
 def evaluate_clustering_metrics(
     df,
@@ -163,6 +252,3 @@ def evaluate_clustering_metrics(
     metrics_df = pd.DataFrame(results)
     logging.info(f"\n=== Completed multi-run evaluation for dataset: {dataset_name} ===\n")
     return metrics_df
-
-
-

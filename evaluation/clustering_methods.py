@@ -253,7 +253,7 @@ def _append_selected_metrics(metrics_accumulator, selected_metrics, method_name,
             logging.warning("    Metric %s failed on %s: %s", metric_name, method_name, metric_err)
 
 
-def _append_novel_full_metrics(metrics_accumulator, selected_metrics, method_name, df_result, feature_columns):
+def _append_full_scope_metrics(metrics_accumulator, selected_metrics, method_name, df_result, feature_columns):
     try:
         evaluation_scores = evaluate_prediction_scopes(
             df=df_result,
@@ -266,10 +266,69 @@ def _append_novel_full_metrics(metrics_accumulator, selected_metrics, method_nam
             full_suffix=" (full)",
         )
         for metric_name, score in evaluation_scores.items():
-            if metric_name.endswith(" (full)") or metric_name == "Rejected Count":
+            if (
+                metric_name.endswith(" (full)")
+                or metric_name in {"Rejected Count", "Rejection Rate"}
+            ):
                 metrics_accumulator[metric_name][method_name].append(score)
     except Exception as metric_err:
         logging.warning("    Full-dataset evaluation failed on %s: %s", method_name, metric_err)
+
+
+def _should_skip_method(method_name, dataset_name, clustering_flags, skip_methods):
+    if clustering_flags.get(method_name, False) and method_name not in skip_methods:
+        return False
+
+    logging.debug(
+        "    Skipping clustering method %s for dataset %s due to flag or skip configuration.",
+        method_name,
+        dataset_name,
+    )
+    return True
+
+
+def _get_repeat_count(method_name, dataset_name, num_repeats, methods_to_average):
+    if method_name in methods_to_average and dataset_name != 'cover_type':
+        return num_repeats
+    return 3
+
+
+def _load_repeat_dataset(load_dataset, dataset_name, random_seed, repeat, k, percent_labelled, standardise):
+    return load_dataset(
+        dataset_name,
+        random_seed + repeat,
+        k,
+        percent_labelled,
+        standardise,
+    )
+
+
+def _run_method_once(config, df, feature_columns, k):
+    start = time.time()
+    df_result = config['function'](df, feature_columns, n_clusters=k, **config['params'])
+    return df_result, time.time() - start
+
+
+def _record_method_results(
+    metrics_accumulator,
+    last_results,
+    selected_metrics,
+    method_name,
+    df_result,
+    feature_columns,
+    elapsed,
+):
+    metrics_accumulator['runtime (s)'][method_name].append(elapsed)
+    metrics_accumulator['Dataset Size'][method_name].append(len(df_result))
+    _store_last_result(last_results, method_name, df_result)
+    _append_selected_metrics(metrics_accumulator, selected_metrics, method_name, df_result, feature_columns)
+    _append_full_scope_metrics(
+        metrics_accumulator,
+        selected_metrics,
+        method_name,
+        df_result,
+        feature_columns,
+    )
 
 
 def run_metrics_time_clusterings(
@@ -286,34 +345,42 @@ def run_metrics_time_clusterings(
     selected_metrics=None,
     num_examples=None,
 ):
+    """
+    Run enabled clustering methods for one dataset and collect repeated-run outputs.
+
+    Returns:
+        tuple:
+            - metrics_by_dataset: nested dict of
+              {dataset_name -> {metric_name -> {method_name -> [scores_across_repeats]}}}
+            - result_frames_by_method: dict of
+              {method_name -> DataFrame[['y_true', 'y_live', method_name]]}
+              from the latest successful run, used for plotting/inspection
+    """
     logging.debug("\n=== Running clustering algorithms for dataset: %s ===", dataset_name)
 
     skip_methods = skip_clusterings.get(dataset_name, set())
-    metrics_df = {}
-    last_results = {}
+    metrics_by_dataset = {}
+    result_frames_by_method = {}
     metrics_accumulator = defaultdict(lambda: defaultdict(list))
 
     methods_to_average = {'COPKmeans', 'ConstrainedKMeans', 'SeededKMeans', 'novel_method'}
 
     for method_name, config in clustering_configs.items():
-        if not clustering_flags.get(method_name, False) or method_name in skip_methods:
-            logging.debug(
-                "    Skipping clustering method %s for dataset %s due to flag or skip configuration.",
-                method_name,
-                dataset_name,
-            )
+        if _should_skip_method(method_name, dataset_name, clustering_flags, skip_methods):
             continue
 
-        repeats = num_repeats if method_name in methods_to_average and dataset_name != 'cover_type' else 3
+        repeats = _get_repeat_count(method_name, dataset_name, num_repeats, methods_to_average)
 
         for repeat in range(repeats):
             logging.info("\n--> Running clustering method: %s (Repeat %d/%d)", method_name, repeat + 1, repeats)
             logging.debug("    Parameters: %s", config['params'])
 
             try:
-                df, _, _, feature_columns = load_dataset(
+                df, _, _, feature_columns = _load_repeat_dataset(
+                    load_dataset,
                     dataset_name,
-                    random_seed + repeat,
+                    random_seed,
+                    repeat,
                     k,
                     percent_labelled,
                     standardise,
@@ -327,27 +394,21 @@ def run_metrics_time_clusterings(
                 logging.warning("    Skipping repeat %d: Not enough seeds per cluster: %s", repeat + 1, labelled_counts)
                 continue
 
-            start = time.time()
             try:
-                df_result = config['function'](df, feature_columns, n_clusters=k, **config['params'])
+                df_result, elapsed = _run_method_once(config, df, feature_columns, k)
             except Exception as err:
                 logging.warning("    ERROR while running %s on repeat %d: %s", method_name, repeat + 1, err)
                 continue
 
-            elapsed = time.time() - start
-            metrics_accumulator['runtime (s)'][method_name].append(elapsed)
-            _store_last_result(last_results, method_name, df_result)
+            _record_method_results(
+                metrics_accumulator,
+                result_frames_by_method,
+                selected_metrics,
+                method_name,
+                df_result,
+                feature_columns,
+                elapsed,
+            )
 
-            _append_selected_metrics(metrics_accumulator, selected_metrics, method_name, df_result, feature_columns)
-
-            if method_name == "novel_method":
-                _append_novel_full_metrics(
-                    metrics_accumulator,
-                    selected_metrics,
-                    method_name,
-                    df_result,
-                    feature_columns,
-                )
-
-    metrics_df[dataset_name] = metrics_accumulator
-    return metrics_df, last_results
+    metrics_by_dataset[dataset_name] = metrics_accumulator
+    return metrics_by_dataset, result_frames_by_method

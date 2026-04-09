@@ -40,3 +40,5 @@ notebooks/results/
 # IDE and editor junk
 .vscode/
 .idea/
+
+results_paper_version/

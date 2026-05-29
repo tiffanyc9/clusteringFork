@@ -5,7 +5,7 @@ from sklearn.cluster import KMeans, MeanShift, estimate_bandwidth, DBSCAN, Agglo
 from sklearn.mixture import GaussianMixture
 from sklearn.cluster import SpectralClustering
 from k_means_constrained import KMeansConstrained
-from copkmeans.cop_kmeans import cop_kmeans
+from copkmeans.cop_kmeans import cop_kmeans #TEST_RUN
 import hdbscan
 from clustering_nassir.cluster import SemiSupervisedClusterer
 from scipy.optimize import linear_sum_assignment

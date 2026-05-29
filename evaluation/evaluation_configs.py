@@ -1,19 +1,30 @@
-# %%
 from evaluation.clustering_methods import (
-    kmeans_clustering, meanshift_clustering, dbscan_clustering,
-    agglomerative_clustering, gmm_clustering, spectral_clustering,
-    constrained_kmeans_clustering, copk_means_clustering, hdbscan_clustering, 
-    seeded_k_means_clustering, novel_clustering, dec_clustering,
+    agglomerative_clustering,
+    constrained_kmeans_clustering,
+    copk_means_clustering,
+    dbscan_clustering,
+    dec_clustering,
+    gmm_clustering,
+    hdbscan_clustering,
+    kmeans_clustering,
+    meanshift_clustering,
+    novel_clustering,
+    seeded_k_means_clustering,
+    spectral_clustering,
 )
-
 from utilities.evaluation_metrics import (
-    compute_accuracy, compute_purity, compute_homogeneity, compute_ari,
-    compute_completeness, compute_v_measure, compute_nmi, compute_fmi,
-    compute_silhouette, compute_davies_bouldin, compute_calinski_harabasz,
-    evaluate_clustering_metrics
+    compute_accuracy,
+    compute_ari,
+    compute_completeness,
+    compute_fmi,
+    compute_homogeneity,
+    compute_nmi,
+    compute_purity,
+    compute_v_measure,
 )
 
-def make_entry(name, percent_labelled, k, plot_figure=False, standardise=False, random_seed=None):
+
+def _dataset(name, percent_labelled, k, plot_figure=False, standardise=False, random_seed=None):
     return {
         "name": name,
         "percent_labelled": percent_labelled,
@@ -23,161 +34,108 @@ def make_entry(name, percent_labelled, k, plot_figure=False, standardise=False, 
         "random_seed": random_seed,
     }
 
-# %% read in dataset; the following datasets have been pre-processed so that the last column
-# is the class label, and the rest are features, the class column is integer encoded,
-# all feature columns have been given a name. 
 
+def _method(function, **params):
+    return {
+        "function": function,
+        "params": params,
+    }
+
+
+# Datasets are pre-processed so the final column is the integer-encoded class label
+# and all preceding columns are named features.
 dataset_dict = {
-    # 0: make_entry("1d_simple", 0.03, 3, plot_figure=False, standardise=False, random_seed=None),
-    1: make_entry("1d_gauss", 0.002, 3, plot_figure=False, standardise=False, random_seed=None),
-    2: make_entry("2d_gauss", 0.01, 8, plot_figure=True, standardise=False, random_seed=6772), # 4549 6628 743 8858 6772
-    3: make_entry("iris", 0.2, 3, plot_figure=False, standardise=False, random_seed=None), # 8338 3480 9093
-    4: make_entry("wine", 0.3, 3, plot_figure=False, standardise=False, random_seed=None), # 3169 9942
-    5: make_entry("breast_cancer", 0.07, 2, plot_figure=False, standardise=False, random_seed=None), # 1451
-    6: make_entry("seeds", 0.2, 3, plot_figure=False, standardise=False, random_seed=None), # 8993
-    7: make_entry("glass", 0.3, 6, plot_figure=False, standardise=False, random_seed=None), # 1986
-    8: make_entry( "ionosphere_UMAP10", 0.1, 2, plot_figure=False, standardise=False, random_seed=None), # 4574
-    9: make_entry(# good example for failure analysis as methods do not perform well
-        "yeast", 0.05, 4, plot_figure=False, standardise=False, random_seed=None), 
-    10: make_entry(# 21, appears more than 2 clusters, unclear ground truth
-        "banknote", 0.02, 2, plot_figure=False, standardise=False, random_seed=None), # 21
-    11: make_entry("pendigits", 0.025, 10, plot_figure=False, standardise=False, random_seed=None), # 769 
-    12: make_entry("land_mines", 0.3, 5, plot_figure=False, standardise=False, random_seed=None),
-    13: make_entry("MNIST_UMAP10", 0.05, 10, plot_figure=False, standardise=False, random_seed=None), # 4470
-    14: make_entry("6NewsgroupsUMAP10", 0.01, 6, plot_figure=False, standardise=False, random_seed=None),
-    15: make_entry( # highly imbalanced, one class dominates 78%, not good # 6435
-        "shuttle", 0.002, 3, plot_figure=False, standardise=False, random_seed=None), #2196 
-    16: make_entry("cover_type", percent_labelled=2e-4, k=7, plot_figure=False, standardise=False, random_seed=None),
+    # 0: _dataset("1d_simple", 0.03, 3),
+    1: _dataset("1d_gauss", 0.002, 3),
+    2: _dataset("2d_gauss", 0.01, 8, plot_figure=True, random_seed=6772),  # 4549 6628 743 8858 6772
+    3: _dataset("iris", 0.2, 3),  # 8338 3480 9093
+    4: _dataset("wine", 0.3, 3),  # 3169 9942
+    5: _dataset("breast_cancer", 0.07, 2),  # 1451
+    6: _dataset("seeds", 0.2, 3),  # 8993
+    7: _dataset("glass", 0.3, 6),  # 1986
+    8: _dataset("ionosphere_UMAP10", 0.1, 2),  # 4574
+    9: _dataset("yeast", 0.05, 4),  # good example for failure analysis
+    10: _dataset("banknote", 0.02, 2),  # 21, appears more than 2 clusters
+    11: _dataset("pendigits", 0.025, 10),  # 769
+    12: _dataset("land_mines", 0.3, 5),
+    13: _dataset("MNIST_UMAP10", 0.10, 10),  # 4470
+    14: _dataset("6NewsgroupsUMAP10", 0.02, 6),
+    15: _dataset("shuttle", 0.002, 3),  # highly imbalanced, one class dominates
+    16: _dataset("cover_type", 2e-4, 7),
 }
 
-# ---------------------------- Clustering Algorithm Setup and Execution ------------------------
 
-# Flags to enable/disable specific clustering algorithms
 clustering_flags = {
-    # Unsupervised clustering methods
-    'KMeans': True,
-    'MeanShift': True, 
-    'DBSCAN': True,
-    'HDBSCAN': True,
-    'Agglomerative': True, 
-    'GMM': True,
-    'Spectral': False, 
-
-    # Semi-supervised clustering methods
-    'ConstrainedKMeans': True,
-    'COPKMeans': True, 
-    'SeededKMeans': True,
-    'novel_method': True,
-
-    # Deep learning (self-)unsupervised clustering
-    'DEC': True,
+    "KMeans": True,
+    "MeanShift": False,
+    "DBSCAN": True,
+    "HDBSCAN": False,
+    "Agglomerative": True,
+    "GMM": True,
+    "Spectral": False,
+    "ConstrainedKMeans": True,
+    "COPKMeans": True,
+    "SeededKMeans": True,
+    "novel_method": True,
+    "DEC": True,
 }
 
-# Configuration dictionary mapping method names to their functions and parameters
+
+_REMAP_TO_TRUE = {
+    "target_column": "y_true",
+    "remap_labels": True,
+}
+
 clustering_configs = {
-    'KMeans': {
-        'function': kmeans_clustering,
-        'params': {
-            'target_column': 'y_true',
-            'remap_labels': True,
-        }
-    },
-    'MeanShift': {
-        'function': meanshift_clustering,
-        'params': {
-            'target_column': 'y_true',
-            'remap_labels': True,
-        }
-    },
-    'DBSCAN': {
-        'function': dbscan_clustering,
-        'params': {
-            'target_column': 'y_true',
-            'remap_labels': True,
-        }
-    },
-    'HDBSCAN': {
-        'function': hdbscan_clustering,
-        'params': {
-            'target_column': 'y_true',
-            'min_cluster_size': 5,
-            'min_samples': None,
-            'remap_labels': True,
-        }
-    },
-    'Agglomerative': {
-        'function': agglomerative_clustering,
-        'params': {
-            'target_column': 'y_true',
-            'remap_labels': True,
-        }
-    },
-    'GMM': {
-        'function': gmm_clustering,
-        'params': {
-            'target_column': 'y_true',
-            'remap_labels': True,
-        }
-    },
-    'Spectral': {
-        'function': spectral_clustering,
-        'params': {
-            'target_column': 'y_true',
-            'remap_labels': True,
-        }
-    },
-    'ConstrainedKMeans': {
-        'function': constrained_kmeans_clustering,
-        'params': {
-            'target_column': 'y_true',
-            'size_min': 15,
-            'size_max': None, # set it to df.shape[0]
-            'remap_labels': True,
-        }
-    },
-    'COPKMeans': {
-        'function': copk_means_clustering,
-        'params': {
-            'target_column': 'y_true',
-            'label_column': 'y_live',
-            'remap_labels': True,
-        }
-    },
-    'SeededKMeans': {
-        'function': seeded_k_means_clustering,
-        'params': {
-            'target_column': 'y_true',
-            'seeds': 'y_live',
-            'remap_labels': True,
-        }
-    },
-    'novel_method': {
-        'function': novel_clustering,
-        'params': {
-            'target_column': 'y_true',
-            'seeds': 'y_live',
-            'remap_labels': False,  # No label remapping for novel method
-        }
-    },
-    'DEC': {
-        'function': dec_clustering,
-        'params': {
-            'pretrain_epochs': 10,      # Default: 100 (reduced here for quick runs)
-            'clustering_epochs': 10,    # Default: 150
-            'target_column': 'y_true',
-            'remap_labels': True,
-        }
-    },
+    "KMeans": _method(kmeans_clustering, **_REMAP_TO_TRUE),
+    "MeanShift": _method(meanshift_clustering, **_REMAP_TO_TRUE),
+    "DBSCAN": _method(dbscan_clustering, **_REMAP_TO_TRUE),
+    "HDBSCAN": _method(
+        hdbscan_clustering,
+        **_REMAP_TO_TRUE,
+        min_cluster_size=5,
+        min_samples=None,
+    ),
+    "Agglomerative": _method(agglomerative_clustering, **_REMAP_TO_TRUE),
+    "GMM": _method(gmm_clustering, **_REMAP_TO_TRUE),
+    "Spectral": _method(spectral_clustering, **_REMAP_TO_TRUE),
+    "ConstrainedKMeans": _method(
+        constrained_kmeans_clustering,
+        **_REMAP_TO_TRUE,
+        size_min=15,
+        size_max=None,  # set dynamically to df.shape[0] in the method
+    ),
+    "COPKMeans": _method(
+        copk_means_clustering,
+        **_REMAP_TO_TRUE,
+        label_column="y_live",
+    ),
+    "SeededKMeans": _method(
+        seeded_k_means_clustering,
+        **_REMAP_TO_TRUE,
+        seeds="y_live",
+    ),
+    "novel_method": _method(
+        novel_clustering,
+        target_column="y_true",
+        seeds="y_live",
+        remap_labels=False,
+    ),
+    "DEC": _method(
+        dec_clustering,
+        **_REMAP_TO_TRUE,
+        pretrain_epochs=10,   # default 100
+        clustering_epochs=10,  # default 150
+    ),
 }
 
-# ---------------------------- Run Clustering Algorithms and Measure Runtime ------------------------
 
-skip_clustering = { # these methods take too long on these datasets
+skip_clustering = {
     "shuttle": {
         "MeanShift",
         "Agglomerative",
         "Spectral",
-        "COPKMeans"
+        "COPKMeans",
     },
     "cover_type": {
         "MeanShift",
@@ -189,19 +147,14 @@ skip_clustering = { # these methods take too long on these datasets
     },
 }
 
-    # Define all metrics as tuples: (metric_name, metric_function, requires_ground_truth)
+
 selected_metrics = {
-    'Accuracy': {'fn': compute_accuracy, 'requires_gt': True},
-    'Purity': {'fn': compute_purity, 'requires_gt': True},
-    'Homogeneity': {'fn': compute_homogeneity, 'requires_gt': True},
-    'Completeness': {'fn': compute_completeness, 'requires_gt': True},
-    'V-Measure': {'fn': compute_v_measure, 'requires_gt': True},
-    'NMI': {'fn': compute_nmi, 'requires_gt': True},
-    'ARI': {'fn': compute_ari, 'requires_gt': True},
-    'FMI': {'fn': compute_fmi, 'requires_gt': True},
-    
-    # Internal metrics (optional to include)
-    # 'Silhouette Score': {'fn': compute_silhouette, 'requires_gt': False},
-    # 'Davies-Bouldin Index': {'fn': compute_davies_bouldin, 'requires_gt': False},
-    # 'Calinski-Harabasz Index': {'fn': compute_calinski_harabasz, 'requires_gt': False},
+    "Accuracy": {"fn": compute_accuracy, "requires_gt": True},
+    "Purity": {"fn": compute_purity, "requires_gt": True},
+    "Homogeneity": {"fn": compute_homogeneity, "requires_gt": True},
+    "Completeness": {"fn": compute_completeness, "requires_gt": True},
+    "V-Measure": {"fn": compute_v_measure, "requires_gt": True},
+    "NMI": {"fn": compute_nmi, "requires_gt": True},
+    "ARI": {"fn": compute_ari, "requires_gt": True},
+    "FMI": {"fn": compute_fmi, "requires_gt": True},
 }

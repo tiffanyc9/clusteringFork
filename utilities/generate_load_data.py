@@ -327,7 +327,7 @@ def generate_clustering_2d_gauss_data(
 
 def prepare_and_seed_dataset(dataset_name, percent_labelled, k, random_seed, label_column):
     # Read data from the processed folder CSV
-    project_root = os.path.abspath(os.path.join(os.getcwd(), ".."))
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     csv_file_path = os.path.join(project_root, "data", "processed", f"{dataset_name}.csv")
     df = pd.read_csv(csv_file_path)
 

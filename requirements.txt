@@ -11,8 +11,10 @@ umap-learn
 kneed
 hdbscan
 k-means-constrained
-copkmeans
+git+https://github.com/Behrouz-Babaki/COP-Kmeans.git
 clustpy
 perception_nassir
 nltk
 wordcloud
+torch 
+torchvision

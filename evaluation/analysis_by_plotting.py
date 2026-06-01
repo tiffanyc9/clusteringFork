@@ -125,7 +125,7 @@ for dataset_cfg in dataset_dict.values():
                 my_logger.warning(f"Skipping: Not enough seeds per cluster: {labelled_counts}")
                 continue
 
-            clf = NovelClustering()
+            clf = SemiSupervisedClusterer()
             df["novel_method"] = clf.fit(df[feature_columns + ['y_live']].to_numpy())
             df_filtered = df[(df['y_true'] != -1) & (df['novel_method'] != -1)]
 

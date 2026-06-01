@@ -45,6 +45,8 @@ pip install .
 
 Use this if you want to run the notebooks, evaluation scripts, and paper experiments.
 
+<!-- ### macOS
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate
@@ -52,7 +54,29 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+### Windows
+```bash
+python -m venv .venv
+source .venv/Scripts/activate
+pip install -r requirements.txt
+pip install -e .
+``` -->
+
+### Conda environment
+```bash
+conda create --name clustering python=3.11
+conda activate clustering
+pip install -r requirements.txt
+pip install -e .
+```
+
 The repository-level `requirements.txt` includes the extra scientific and notebook dependencies used by the evaluation code. The package `setup.py` remains focused on the core library dependency set.
+
+**Note:** On Windows, installing `clustpy` may fail with the error: "Microsoft Visual C++ 14.0 or greater is required". `clustpy` requires compiling C/C++ extensions, and Windows does not include a compiler by default. Fix:
+1. Download and install Microsoft C++ Build Tools.
+2. During installation, select the "Desktop development with C++" workload. 
+3. Restart your terminal after installation and re-run `pip install -r requirements.txt`
+
 
 ## Quick Start
 
@@ -64,7 +88,7 @@ df = pd.DataFrame(
     {
         "x1": [0.0, 0.2, 0.1, 4.9, 5.0, 5.2, 9.0],
         "x2": [0.1, 0.0, 0.3, 5.1, 4.8, 5.0, 9.1],
-        "y_live": [0, 0, -1, 1, 1, -1, -1],
+        "y_live": [0, 0, 0, 1, 1, 1, -1],
     }
 )
 

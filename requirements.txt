@@ -18,3 +18,4 @@ nltk
 wordcloud
 torch 
 torchvision
+./tools/clustpy-0.0.2-cp311-cp311-win_amd64.whl

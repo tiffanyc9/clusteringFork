@@ -72,12 +72,6 @@ pip install -e .
 
 The repository-level `requirements.txt` includes the extra scientific and notebook dependencies used by the evaluation code. The package `setup.py` remains focused on the core library dependency set.
 
-**Note:** On Windows, installing `clustpy` may fail with the error: "Microsoft Visual C++ 14.0 or greater is required". `clustpy` requires compiling C/C++ extensions, and Windows does not include a compiler by default. Fix:
-1. Download and install Microsoft C++ Build Tools.
-2. During installation, select the "Desktop development with C++" workload. 
-3. Restart your terminal after installation and re-run `pip install -r requirements.txt`
-
-
 ## Quick Start
 
 ```python

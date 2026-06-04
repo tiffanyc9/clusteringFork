@@ -1,3 +1,21 @@
+"""
+Clustering method wrappers and evaluation runner.
+
+This module is used by the clustering notebooks to apply a shared set of
+unsupervised and semi-supervised clustering algorithms to a pandas DataFrame.
+Each clustering wrapper expects feature columns, writes predicted cluster
+labels back into the DataFrame under a method-specific column, and can
+optionally remap arbitrary cluster IDs to known ground-truth labels for easier
+comparison.
+
+The bottom half of the file coordinates repeated experiments: it loads dataset
+variants, runs the enabled clustering methods, records runtime and dataset size,
+and collects the selected evaluation metrics for plotting or inspection.
+If you are new to this code, start with `run_metrics_time_clusterings`, then
+follow the `clustering_configs` entries passed in from the notebook to see
+which wrapper functions are being executed.
+"""
+
 import logging
 import time
 from collections import defaultdict
@@ -216,7 +234,8 @@ def dec_clustering(df, feature_columns, n_clusters=None,
         pretrain_epochs=pretrain_epochs,
         clustering_epochs=clustering_epochs,
     )
-    clusterer.fit(df[feature_columns].to_numpy())
+    features = df[feature_columns].to_numpy(copy=True)
+    clusterer.fit(features)
 
     if remap_labels and target_column in df.columns:
         df['DEC'] = remap_clusters_hungarian_with_noise(clusterer.labels_, df[target_column].to_numpy())
